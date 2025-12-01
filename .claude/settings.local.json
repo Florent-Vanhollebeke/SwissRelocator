@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python index_faiss.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
