@@ -44,7 +44,16 @@ def normalize_city(city):
     zurich_neighborhoods = ['oerlikon', 'seebach', 'leimbach zh']
     if city_lower in zurich_neighborhoods:
         return 'Zürich'
-    
+
+    # Bâle / Basel
+    if city_lower in ['bâle', 'basel', 'basle', 'bale']:
+        return 'Basel'
+
+    # Quartiers de Basel
+    basel_neighborhoods = ['riehen', 'bettingen', 'birsfelden', 'muttenz', 'pratteln', 'allschwil', 'binningen']
+    if city_lower in basel_neighborhoods:
+        return 'Basel'
+
     # Par défaut, capitaliser proprement
     return city.strip().title()
 

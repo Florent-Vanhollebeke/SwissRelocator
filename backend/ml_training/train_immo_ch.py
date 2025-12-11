@@ -18,9 +18,9 @@ import joblib
 PROJECT_ROOT = Path(__file__).parent.parent.parent  # SwissRelocator/
 BACKEND_DIR = PROJECT_ROOT / "backend"
 
-# Données d'entrée (CSV nettoyé par preprocess.py)
+# Données d'entrée (CSV nettoyé par post_clean_immoscout.py)
 PROCESSED_DATA_DIR = BACKEND_DIR / "data" / "processed"
-INPUT_CSV = PROCESSED_DATA_DIR / "immoscout_suisse_final.csv"
+INPUT_CSV = PROCESSED_DATA_DIR / "immoscout_suisse_clean_final.csv"
 
 # Modèles de sortie
 ML_MODELS_DIR = BACKEND_DIR / "ml_models"
@@ -55,7 +55,8 @@ print("\n1️⃣  Features géographiques...")
 city_centers = {
     'Genève': (46.2044, 6.1432),
     'Zürich': (47.3769, 8.5417),
-    'Lausanne': (46.5197, 6.6323)
+    'Lausanne': (46.5197, 6.6323),
+    'Basel': (47.5596, 7.5886)
 }
 
 def calculate_distance_from_center(row):
@@ -106,12 +107,9 @@ df_ml['pieces_filled'] = df_ml.groupby(['city_normalized', 'categorie_taille'])[
 df_ml['pieces_filled'] = df_ml['pieces_filled'].fillna(df_ml['pieces'].median())
 df_ml['pieces_unknown'] = (df_ml['pieces'].isna()).astype(int)
 
-# 2.6 Quartier premium
-df_ml['is_premium_area'] = (df_ml['prix_m2'] > df_ml.groupby('city_normalized')['prix_m2'].transform('median') * 1.5).astype(int)
-
-# 2.7 Interaction features
+# 2.6 Interaction features (sans data leakage)
 df_ml['surface_ville'] = df_ml['surface'] * df_ml['ville_encoded']
-df_ml['prix_m2_distance'] = df_ml['prix_m2'] * df_ml['distance_centre']
+df_ml['surface_distance'] = df_ml['surface'] * df_ml['distance_centre']
 
 print(f"   ✓ {len(df_ml.columns)} features créées")
 
@@ -123,26 +121,25 @@ print("\n" + "="*70)
 print("📋 SÉLECTION DES FEATURES")
 print("="*70)
 
-# Features à utiliser pour le ML
+# Features à utiliser pour le ML (SANS data leakage - pas de prix_m2)
 features_to_use = [
     # Géographiques
     'latitude', 'longitude', 'distance_centre', 'ville_encoded',
-    
+
     # Surface
     'surface', 'surface_log', 'surface_squared',
-    
+
     # Caractéristiques (NaN gérés)
     'pieces_filled', 'pieces_unknown',
     'etage_filled', 'etage_unknown', 'is_ground_floor', 'is_high_floor',
     'type_bien_encoded',
-    
+
     # Équipements
     'has_parking_int', 'has_lift_int',
-    
-    # Premium & interactions
-    'is_premium_area',
+
+    # Interactions (sans prix_m2)
     'surface_ville',
-    'prix_m2_distance'
+    'surface_distance'
 ]
 
 # Supprimer lignes avec NaN dans les features CRITIQUES uniquement

@@ -21,7 +21,7 @@ RAW_DATA_DIR = BACKEND_DIR / "data" / "raw" / "immoscout"
 PROCESSED_DATA_DIR = BACKEND_DIR / "data" / "processed"
 
 # Configuration scraping
-VILLES = ["Genève", "Lausanne", "Zurich"]
+VILLES = ["Genève", "Lausanne", "Zurich", "Bale"]
 TYPES_TRANSACTION = ["Location", "Vente"]
 TYPES_BIEN = ["Bureau", "Commercial"]
 
@@ -100,6 +100,75 @@ def load_all_json_files(base_dir, villes, types_transaction, types_bien):
     return all_data
 
 # ============================================
+# TRADUCTION ALLEMAND -> FRANÇAIS (features ImmoScout)
+# ============================================
+
+FEATURE_TRANSLATIONS_DE_FR = {
+    # Surface
+    'Nutzfläche': 'Surface utile',
+    'Wohnfläche': 'Surface habitable',
+    'Fläche': 'Surface',
+    'Minimale Nutzfläche': 'Surface utile minimale',
+
+    # Étage / Bâtiment
+    'Stockwerk': 'Etage',
+    'Etage': 'Etage',
+    'Anzahl Stockwerke': "Nombre d'étage(s)",
+    'Baujahr': 'Année de construction',
+    'Letzte Renovation': 'Dernière rénovation',
+    'Raumhöhe': 'Hauteur des pièces',
+
+    # Pièces
+    'Zimmer': 'Nombre de pièce(s)',
+    'Anzahl Zimmer': 'Nombre de pièce(s)',
+    'Badezimmer': 'Qté salles de bain',
+
+    # Disponibilité
+    'Verfügbarkeit': 'Disponibilité',
+    'Verfügbar ab': 'Disponibilité',
+    'Nach Vereinbarung': 'Selon accord',
+    'Sofort': 'Immédiatement',
+
+    # Type
+    'Typ': 'Type',
+    'Büro': 'Bureau',
+    'Gewerbe': 'Commercial',
+    'Geschäftslokal': 'Local commercial',
+
+    # Équipements (features secondaires)
+    'Lift': 'Ascenseur',
+    'Aufzug': 'Ascenseur',
+    'Parkplatz': 'Place de parc',
+    'Garage': 'Garage',
+    'Balkon': 'Balcon / Terrasse',
+    'Terrasse': 'Balcon / Terrasse',
+    'Keller': 'Cave',
+    'Rollstuhlgängig': 'Accessible en fauteuil',
+    'Wasseranschluss': "Raccordement d'eau",
+    'Stromanschluss': 'Raccordement électrique',
+    'Neubau': 'Nouvelle construction',
+    'Altbau': 'Ancien bâtiment',
+    'Aussicht': 'Vue',
+    'Ruhige Lage': 'Quartier calme',
+    'Kinderfreundlich': 'Adapté aux enfants',
+    'Haustiere erlaubt': 'Animaux dom. autorisés',
+}
+
+def translate_features(features_dict):
+    """Traduit les features allemandes en français"""
+    translated = {}
+    for key, value in features_dict.items():
+        # Traduire la clé si elle est en allemand
+        translated_key = FEATURE_TRANSLATIONS_DE_FR.get(key, key)
+        # Traduire la valeur si c'est un terme connu
+        if isinstance(value, str):
+            translated_value = FEATURE_TRANSLATIONS_DE_FR.get(value, value)
+        else:
+            translated_value = value
+        translated[translated_key] = translated_value
+    return translated
+
+# ============================================
 # FONCTION DE NETTOYAGE
 # ============================================
 
@@ -107,18 +176,18 @@ def clean_immoscout_data(all_data):
     """
     Nettoie et structure les données ImmoscoutCH
     """
-    
+
     if len(all_data) == 0:
         print("\n❌ Aucune donnée à nettoyer !")
         return None
-    
+
     print("\n" + "="*70)
     print("🧹 NETTOYAGE DES DONNÉES")
     print("="*70)
-    
+
     cleaned_records = []
     errors = []
-    
+
     for idx, item in enumerate(all_data):
         try:
             # ============================================
@@ -127,7 +196,7 @@ def clean_immoscout_data(all_data):
             gps = item.get('gps', '').split(',')
             latitude = float(gps[0].strip()) if len(gps) > 0 and gps[0] else None
             longitude = float(gps[1].strip()) if len(gps) > 1 and gps[1] else None
-            
+
             # ============================================
             # EXTRACTION PRIX
             # ============================================
@@ -137,22 +206,25 @@ def clean_immoscout_data(all_data):
                 price_raw = item.get('priceNet', '')
             else:  # Vente
                 price_raw = item.get('totalPrice') or item.get('priceNet', '')
-            
+
             price = None
             if price_raw:
                 # "CHF 3'750.–" ou "CHF 450'000.–" → 3750 ou 450000
                 price_clean = re.sub(r"[^\d]", "", str(price_raw))
                 price = float(price_clean) if price_clean else None
-            
+
             # ============================================
-            # EXTRACTION SURFACE
+            # EXTRACTION SURFACE (FR + DE)
             # ============================================
-            features = item.get('features', {})
-            
-            # Essayer différentes clés possibles
-            surface_raw = (features.get('Surface habitable') or 
-                          features.get('Surface utile') or 
-                          features.get('Surface') or 
+            features_raw = item.get('features', {})
+            features = translate_features(features_raw)  # Traduire DE -> FR
+
+            # Essayer différentes clés possibles (FR et DE)
+            surface_raw = (features.get('Surface habitable') or
+                          features.get('Surface utile') or
+                          features.get('Surface') or
+                          features.get('Nutzfläche') or  # DE fallback
+                          features.get('Wohnfläche') or  # DE fallback
                           item.get('surface'))
             
             surface = None
@@ -177,31 +249,44 @@ def clean_immoscout_data(all_data):
             city = city_match.group(2).strip() if city_match else item.get('source_ville')
             
             # ============================================
-            # EXTRACTION AUTRES FEATURES
+            # EXTRACTION AUTRES FEATURES (FR + DE)
             # ============================================
-            
-            # Nombre de pièces
-            pieces = features.get("Nombre de pièce(s)") or features.get("Pièces")
+
+            # Nombre de pièces (FR: Nombre de pièce(s), DE: Zimmer)
+            pieces = (features.get("Nombre de pièce(s)") or
+                     features.get("Pièces") or
+                     features.get("Zimmer") or
+                     features.get("Anzahl Zimmer"))
             if pieces:
                 pieces_match = re.search(r'(\d+(?:\.\d+)?)', str(pieces))
                 pieces = float(pieces_match.group(1)) if pieces_match else None
-            
-            # Étage
-            etage = features.get("Etage") or features.get("Étage")
+
+            # Étage (FR: Etage, DE: Stockwerk)
+            etage = (features.get("Etage") or
+                    features.get("Étage") or
+                    features.get("Stockwerk"))
             if etage:
                 etage_match = re.search(r'(\d+)', str(etage))
                 etage = int(etage_match.group(1)) if etage_match else None
-            
-            # Type de bien
-            property_type = features.get("Type", item.get('source_bien_type', 'Bureau'))
-            
-            # Disponibilité
-            disponibilite = features.get("Disponibilité") or features.get("Disponible dès")
-            
-            # Features secondaires
+
+            # Type de bien (FR: Type, DE: Typ)
+            property_type = (features.get("Type") or
+                           features.get("Typ") or
+                           item.get('source_bien_type', 'Bureau'))
+
+            # Disponibilité (FR: Disponibilité, DE: Verfügbarkeit)
+            disponibilite = (features.get("Disponibilité") or
+                           features.get("Disponible dès") or
+                           features.get("Verfügbarkeit") or
+                           features.get("Verfügbar ab"))
+
+            # Features secondaires (FR + DE keywords)
             features_secondary = item.get('featuresSecondary', [])
-            has_parking = any('parc' in str(f).lower() for f in features_secondary)
-            has_lift = any('ascenseur' in str(f).lower() or 'lift' in str(f).lower() for f in features_secondary)
+            # Traduire les features secondaires aussi
+            features_secondary_translated = [FEATURE_TRANSLATIONS_DE_FR.get(f, f) for f in features_secondary]
+
+            has_parking = any('parc' in str(f).lower() or 'parkplatz' in str(f).lower() for f in features_secondary)
+            has_lift = any('ascenseur' in str(f).lower() or 'lift' in str(f).lower() or 'aufzug' in str(f).lower() for f in features_secondary)
             
             # ============================================
             # CRÉER LE RECORD NETTOYÉ

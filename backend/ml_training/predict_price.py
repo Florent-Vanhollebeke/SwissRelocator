@@ -25,7 +25,7 @@ def predire_prix_bureau(ville, surface, latitude, longitude,
     Paramètres:
     -----------
     ville : str
-        'Genève', 'Zürich' ou 'Lausanne'
+        'Genève', 'Zürich', 'Lausanne' ou 'Basel'
     surface : float
         Surface en m²
     latitude : float
@@ -55,7 +55,8 @@ def predire_prix_bureau(ville, surface, latitude, longitude,
     city_centers = {
         'Genève': (46.2044, 6.1432),
         'Zürich': (47.3769, 8.5417),
-        'Lausanne': (46.5197, 6.6323)
+        'Lausanne': (46.5197, 6.6323),
+        'Basel': (47.5596, 7.5886)
     }
     center_lat, center_lon = city_centers[ville]
     lat_diff = latitude - center_lat
@@ -66,9 +67,19 @@ def predire_prix_bureau(ville, surface, latitude, longitude,
     surface_log = np.log1p(surface)
     surface_squared = surface ** 2
     
+    # Normaliser le nom de ville (FR/DE)
+    ville_normalized = ville.lower().strip()
+    ville_norm_map = {
+        'bale': 'Basel', 'bâle': 'Basel', 'basel': 'Basel', 'basle': 'Basel',
+        'genève': 'Genève', 'geneve': 'Genève', 'geneva': 'Genève', 'genf': 'Genève',
+        'zürich': 'Zürich', 'zurich': 'Zürich',
+        'lausanne': 'Lausanne'
+    }
+    ville = ville_norm_map.get(ville_normalized, ville)
+
     # Encodages
-    ville_mapping = {'Centre': 0, 'Genève': 1, 'Lausanne': 2, 'Zürich': 3}
-    ville_encoded = ville_mapping[ville]
+    ville_mapping = {'Basel': 0, 'Centre': 1, 'Genève': 2, 'Lausanne': 3, 'Zürich': 4}
+    ville_encoded = ville_mapping.get(ville, 1)  # Default to Centre if unknown
     type_bien_encoded = 0 if type_bien == 'Bureau' else 1
     
     # Features pièces
@@ -85,13 +96,10 @@ def predire_prix_bureau(ville, surface, latitude, longitude,
     has_parking_int = 1 if has_parking else 0
     has_lift_int = 1 if has_lift else 0
     
-    # Premium (approximation par défaut)
-    is_premium_area = 0
-    
-    # Interactions
+    # Interactions (sans data leakage - pas de prix_m2)
     surface_ville = surface * ville_encoded
-    prix_m2_distance = 30 * distance_centre  # Approximation
-    
+    surface_distance = surface * distance_centre
+
     # Créer le vecteur de features (ORDRE IMPORTANT !)
     features = {
         'latitude': latitude,
@@ -110,9 +118,8 @@ def predire_prix_bureau(ville, surface, latitude, longitude,
         'type_bien_encoded': type_bien_encoded,
         'has_parking_int': has_parking_int,
         'has_lift_int': has_lift_int,
-        'is_premium_area': is_premium_area,
         'surface_ville': surface_ville,
-        'prix_m2_distance': prix_m2_distance
+        'surface_distance': surface_distance
     }
     
     df_pred = pd.DataFrame([features])
@@ -202,5 +209,20 @@ if __name__ == "__main__":
         # pieces, etage non fournis → valeurs par défaut
     )
     print(f"   💰 Prix estimé : {prix5:.0f} CHF/mois ({prix5/30:.2f} CHF/m²)")
-    
+
+    # Exemple 6 : Bureau Basel centre (test normalisation ville)
+    print("\n6️⃣  Bureau Basel centre")
+    print("   📐 150m², 5 pièces, 2e étage, ascenseur")
+    prix6 = predire_prix_bureau(
+        ville='Bâle',  # Test normalisation FR -> Basel
+        surface=150,
+        latitude=47.5596,
+        longitude=7.5886,
+        pieces=5,
+        etage=2,
+        has_parking=False,
+        has_lift=True
+    )
+    print(f"   💰 Prix estimé : {prix6:.0f} CHF/mois ({prix6/150:.2f} CHF/m²)")
+
     print("\n" + "="*70)
