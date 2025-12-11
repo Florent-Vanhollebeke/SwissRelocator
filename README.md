@@ -6,6 +6,68 @@ Application complète d'aide à la décision pour les entrepreneurs et entrepris
 
 ---
 
+## 🔒 Privacy by Design - Conformité RGPD/nLPD Suisse
+
+**Architecture hybride respectueuse de la vie privée :**
+
+SwissRelocator adopte une approche **Privacy by Design** conforme au RGPD européen et à la nLPD suisse (nouvelle Loi fédérale sur la protection des données) :
+
+### Traitement local des données sensibles
+- **Ollama (LLM local)** : Collecte des informations utilisateur et restitution des recommandations
+- **Traitement on-premise** : Les données personnelles de l'utilisateur restent sur son infrastructure
+- **Aucun tracking** : Pas de cookies tiers, pas d'analytics invasifs
+
+### Minimisation de l'exposition externe
+- **Claude 3.5 Sonnet (API Anthropic)** : Utilisé uniquement pour les recherches fiscales et tendances sectorielles
+- **Données anonymisées** : Seuls les paramètres fiscaux agrégés sont transmis (CA, masse salariale, canton, secteur)
+- **Sans identité** : Aucune information personnelle identifiable (nom, email, SIREN) n'est envoyée à l'API Claude
+
+### Architecture de confidentialité
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  UTILISATEUR                                                │
+│  ├─ Informations personnelles (nom, entreprise, CA, etc.)  │
+│  └─ Préférences et historique                              │
+└──────────────────┬──────────────────────────────────────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │   OLLAMA (LOCAL)     │  🔒 Données sensibles restent locales
+        │   ├─ Collecte infos  │
+        │   └─ Restitution AI  │
+        └──────────┬───────────┘
+                   │
+                   │ Transmission paramètres fiscaux uniquement
+                   │ (anonymes : CA, canton, nb employés)
+                   ▼
+        ┌──────────────────────┐
+        │  CLAUDE API (Cloud)  │  ☁️ Recherches fiscales uniquement
+        │  └─ Fiscal & trends  │     (sans données personnelles)
+        └──────────┬───────────┘
+                   │
+                   │ Résultat fiscal agrégé
+                   ▼
+        ┌──────────────────────┐
+        │   OLLAMA (LOCAL)     │  🔒 Restitution personnalisée
+        │   └─ Formatage final │     avec contexte utilisateur
+        └──────────────────────┘
+```
+
+### Conformité réglementaire
+- ✅ **RGPD (EU)** : Minimisation des données, droit à l'oubli, transparence
+- ✅ **nLPD (Suisse)** : Protection renforcée des données personnelles
+- ✅ **Privacy by Default** : Paramètres par défaut les plus protecteurs
+- ✅ **Data Residency** : Option de déploiement 100% on-premise disponible
+
+### Avantages pour l'utilisateur
+- **Confidentialité maximale** : Les données sensibles (chiffre d'affaires exact, informations d'entreprise) ne quittent pas l'infrastructure locale
+- **Conformité native** : Architecture pensée pour les exigences suisses et européennes
+- **Transparence totale** : L'utilisateur sait exactement quelles données sont traitées où
+- **Souveraineté des données** : Possibilité de self-hosting complet (Ollama + API locale)
+
+---
+
 ## Fonctionnalités principales
 
 ### 🏢 Prédiction de loyers commerciaux (ML)
@@ -21,10 +83,11 @@ Application complète d'aide à la décision pour les entrepreneurs et entrepris
 - Simulation personnalisée selon le chiffre d'affaires et la masse salariale
 - Prise en compte des spécificités cantonales suisses
 
-### 🤖 Conseiller IA (RAG)
+### 🤖 Conseiller IA (RAG) - Privacy-First
 - Système RAG (Retrieval Augmented Generation) avec **FAISS**
 - Base de connaissances sur la fiscalité et l'immobilier CH/FR
-- Recommandations personnalisées via **Claude 3.5 Sonnet**
+- **Ollama (local)** pour l'interaction utilisateur et la restitution
+- **Claude 3.5 Sonnet (API)** uniquement pour les recherches fiscales et tendances sectorielles (données anonymisées)
 - Recherche sémantique dans 500+ documents
 
 ---
@@ -35,8 +98,10 @@ Application complète d'aide à la décision pour les entrepreneurs et entrepris
 - **Framework** : FastAPI 0.115.0
 - **ML** : XGBoost, scikit-learn, pandas, numpy
 - **RAG** : FAISS (Facebook AI Similarity Search), sentence-transformers
-- **LLM** : Anthropic Claude 3.5 Sonnet API
-- **Scraping** : Playwright (ImmoScout24)
+- **LLM** :
+  - **Ollama (local)** : Interface utilisateur et restitution (Llama 3, Mistral, etc.)
+  - **Claude 3.5 Sonnet API** : Recherches fiscales et tendances sectorielles (données anonymisées)
+- **Scraping** : Extension navigateur JavaScript personnalisée (immo-scraper-extension)
 - **API** : REST avec documentation OpenAPI automatique
 
 ### Frontend (TypeScript/React)
@@ -83,7 +148,26 @@ SwissRelocator/
 ### Prérequis
 - **Python** 3.11+
 - **Node.js** 24.11.1+ (LTS)
+- **Ollama** : LLM local (https://ollama.ai)
 - **Git**
+
+### Installation Ollama (LLM local)
+
+```bash
+# Linux/macOS
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Windows
+# Télécharger depuis https://ollama.ai/download
+
+# Lancer Ollama
+ollama serve
+
+# Télécharger un modèle (ex: Llama 3)
+ollama pull llama3
+# ou Mistral
+ollama pull mistral
+```
 
 ### Backend (FastAPI)
 
@@ -239,11 +323,12 @@ Suppression des features dérivées du target (`prix_m2`) :
 ### RAG & LLM
 - **FAISS** : Recherche vectorielle ultra-rapide (Facebook AI)
 - **sentence-transformers** : Embeddings multilingues
-- **Anthropic Claude 3.5 Sonnet** : LLM de génération
+- **Ollama** : LLM local pour interaction utilisateur (Llama 3, Mistral, Mixtral)
+- **Anthropic Claude 3.5 Sonnet** : Recherches fiscales et tendances sectorielles (données anonymisées)
 
 ### Web Scraping
-- **Playwright** : Automation navigateur (Chrome headless)
-- Gestion anti-détection (user-agents, delays, proxies)
+- **Extension navigateur personnalisée** : JavaScript pour ImmoScout24 (immo-scraper-extension)
+- Extraction automatique des annonces immobilières
 
 ### Backend API
 - **FastAPI** : Framework moderne Python (async, OpenAPI)
@@ -276,7 +361,8 @@ vercel --prod
 ### Variables d'environnement
 ```bash
 # Backend
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...          # Pour recherches fiscales uniquement
+OLLAMA_HOST=http://localhost:11434    # LLM local
 DATABASE_URL=postgresql://...
 
 # Frontend
