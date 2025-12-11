@@ -232,6 +232,12 @@ python index_faiss.py
 
 ## API REST
 
+### Démonstration
+
+Exemple de prédiction pour un bureau de 150m² à Lausanne :
+
+![API Prediction Demo](docs/images/exemple_pred_lausanne.png)
+
 ### Endpoint : Prédiction de loyer
 
 **POST** `/api/v1/predict-rent`
